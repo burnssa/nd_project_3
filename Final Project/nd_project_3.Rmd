@@ -1,7 +1,7 @@
 ```{r setup, cache=FALSE, include=FALSE, message=FALSE}
 library(knitr)
 output <- opts_knit$get("rmarkdown.pandoc.to")
-if (output=="html") opts_chunk$set(fig.width=8, fig.height=8, warning=FALSE, message=FALSE, tidy=TRUE, echo=FALSE)
+if (output=="html") opts_chunk$set(fig.width=6, fig.height=6, warning=FALSE, message=FALSE, tidy=TRUE, echo=FALSE)
 ```
 =======================================================
 
@@ -16,18 +16,18 @@ Project 3: Data Analysis with R
 # Introduction and Background
 ###Why I chose this dataset
 
-I live in the city of Oakland, California, and plan to stay here. I'm very curious about crime trends in the city, as they may have a direct impact on my life and important decisions I encounter in the future. Local crime data is also interesting to cover given the popular perception of Oakland as a relatively dangerous place to live. In exploring dataset options for this project, I came across [this dataset](http://data.openoakland.org/dataset/crime-reports/resource/49bee847-a9b7-4e71-84d8-3f4cabb26cf0) on the website OpenOakland.org - which includes all crime reports from the city of Oakland from 2007 to earlier this summer, including incident details such as geographic location and type of crime. It looked fascinating to me, and I decided to dive in.
+I live in the city of Oakland, California, and plan to stay here. I'm curious about crime trends in the city, as they may have a direct impact on my life and important decisions I encounter in the future. Thus as I was exploring dataset options for this project, I was excited to uncover [this dataset](http://data.openoakland.org/dataset/crime-reports/resource/49bee847-a9b7-4e71-84d8-3f4cabb26cf0) on the website OpenOakland.org - which has records of all crime reports from the city of Oakland from 2007 to earlier this summer, including incident details such as geographic location and crime type. It looked fascinating to me, and I decided to dive in. 
 
-###Questions I'd love to explore
+###Questions initially considered
 
 1. How has the incidence of crime been trending in the city over the last 8 years?
-2. Have incidences of particular types of crime been growing / diminishing differentially over the last few years?
+2. Have incidences of particular types of crime been growing / diminishing differentially?
 3. Where is crime occurring geographically?
 4. How has crime incidence changed in particular areas within the city?
 
-Most of all, I'd like to create a few thought-provoking visualizations and see if they might suggest directions for more in-depth exploration.
+Primarily, my focus was on generating a few thought-provoking visualizations, to see if they might suggest directions for more in-depth exploration.
 
-###About the dataset:
+###About the dataset
 
 The data were downloaded from [data.openoakland.org](http://data.openoakland.org/dataset/crime-reports/resource/49bee847-a9b7-4e71-84d8-3f4cabb26cf0).
 
@@ -52,7 +52,6 @@ getwd()
 crimes <- read.csv('OPD_150708.csv')
 summary(crimes) #Output suppressed for final report
 head(crimes) #to illustrate the available fields, with example values
-
 #Include libraries - all critical to the analysis
 library(dplyr)
 library(ggplot2)
@@ -63,6 +62,7 @@ library(RColorBrewer)
 #install.packages('memisc')
 library(gridExtra)
 library(memisc)
+library(scales)
 ```
 
 I also created two variables to potentially use throughout subsequent plots.
@@ -96,15 +96,17 @@ ggplot(crimes, aes(x = date_format)) +
 
 From the histogram, we see indications that crime reports have fallen significantly in Oakland over the last 7 years, as report counts per 30-day period in 2007 and 2008 appear to number between 9,000 and 10,000, while counts per period have been around 4,000 in recent years.
 
-I was also curious how crimes were distributed throughout the day over the period in question. To see the dynamics, I plotted another histogram by time of day, with hourly bins, creating an `hour` variable to more easily bin incidents. 
+I was also curious how crimes were distributed throughout the day over the period in question. To see the dynamics, I plotted another histogram by time of day, with hourly bins, creating an `hour` variable to more easily bin incidents.
 
 ```{r Exploration - crime incidence by time of day (a)}
 
-crimes$time_format <- as.POSIXct(strptime(crimes$Time, "%H:%M:%S")) #as.POSIXct added to address errors grouping in dplyr
+crimes$time_format <- as.POSIXct(strptime(crimes$Time, "%H:%M:%S")) 
+#as.POSIXct added to address errors grouping in dplyr
 crimes$hour <- as.numeric(format(crimes$time_format, "%H"))
 
 ggplot(crimes, aes(x = hour)) +
   geom_histogram(binwidth = 1)
+
 ```
 
 The hourly distribution suprised me - first by the huge spike at hour 0 (e.g. midnight to 1am). I suspected that this might be related to data entry issues, so I also checked the composition of crimes that were committed at hour zero, loading them from the original `Time` variable. From this, I discovered that 98,823 of the 118,590 `one_am` records have the value exactly "0:00:00". This strengthened my suspicion about the spike being driven by coding issues. 
@@ -137,23 +139,28 @@ summary(subset(crimes$Lng, (crimes$Lng > -123 & crimes$Lng < -122.1 )))
 ggplot(subset(crimes, (Lng > -122.35 & Lng < -122.15)), aes(x = Lng)) +
   geom_histogram()
 
-crimesMapSubset <- subset(crimes, (Lat > 37.7 & Lat < 37.9) & (Lng > -122.35 & Lng < -122.15))
+crimesMapSubset <- subset(crimes, (Lat > 37.7 & Lat < 37.9) & 
+                            (Lng > -122.35 & Lng < -122.15))
 
 ```
 
-Crime seems to skew toward the mid-Northern and West parts of the city, based on the histogram.
+Crime seems to skew toward the mid-Northern and Western parts of the city, based on the histogram.
 
 For a more detailed view of geographic distribution, I decided to use ggmap to plot a basic heatmap of crime in Oakland for the period in question.
 
 ```{r Exploration - crime heatmap by longitude and latitude}
 
 oakland_location <- c(-122.33, 37.71, -122.15, 37.9)
-oakland_map <- get_map(location = oakland_location, source="google", maptype="hybrid")
+oakland_map <- get_map(location = oakland_location, source="google", 
+                       maptype="hybrid")
 
 ggmap(oakland_map) +
   geom_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat), size = 1) +
-  stat_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat, fill = ..level.., alpha = ..level..), size = 0.01, bins = 20, geom = 'polygon') +
-  scale_fill_gradient(low = "green", high = "red")
+  stat_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat, 
+                  fill = ..level.., alpha = ..level..), 
+                  size = 0.01, bins = 20, geom = 'polygon') +
+  scale_fill_gradient(low = "green", high = "red") +
+  guides(fill = guide_legend(position='None'))
 
 ```
 
@@ -203,6 +210,39 @@ The downward trend in crime reports is again evident in plotted monthly crime re
 
 It seems very strange to me that the reported number of crimes would be fairly constant throughout 2012 and 2013, fall by around 40% as the year changed, then persist at a largely constant lower level around 3,700 incidents per month for the next year. I wonder if there was a major change in the way crimes were recorded or reported starting at the beginning of 2014.
 
+To better understand the distribution of daily crime rates, I also plotted mean, median and quartile measures of daily crime rates.
+
+Also - to note - I was seeing several report data points for dates in the future. I assume these were the result of data entry errors. For all plots going forward, I have chosen to subset by incidents occurring prior to a 'cut-off' date of June 2015.
+
+*Mean and median daily crime rates:*
+
+```{r Exploration - line plot of mean and median daily crime rates per month over time (a)}
+cutOffDate = '2015-06-01'
+
+crime_by_day <- subset(crime_by_day, date_format < cutOffDate)
+
+crime_by_day$month <- as.Date(cut(crime_by_day$date_format,
+  breaks = "month"))
+
+daily_by_month <- crime_by_day %>%
+  group_by(month) %>%
+  summarize(mean_incidents = mean(incidents),
+            median_incidents = median(incidents),
+            bottom_quartile = quantile(incidents, 0.25),
+            top_quartile = quantile(incidents, 0.75),
+            bottom_decile = quantile(incidents, 0.1),
+            top_decile = quantile(incidents, 0.9),
+            n = n()) %>%
+  arrange(month)
+
+ggplot(daily_by_month, aes(x=month, y=mean_incidents)) +
+  geom_line(color = 'blue') +
+  geom_line(data = daily_by_month, aes(x=month, y=median_incidents, color = 'red')) +
+  theme(legend.position = "none")
+
+```
+
+
 ### Initial Exploration: Rough plots with incidents segmented by crime type
 
 After having uncovered some interesting insights about local crime trends at an aggregate level, I wanted to dive down into crime segments, using some of the multi-variate visualization techniques we covered in the later lessons of Data Analysis in R
@@ -222,11 +262,13 @@ crimes <- transform(crimes, mainCat =
           ifelse(grepl("ROBBERY|LARCENY", CrimeCat, ignore.case = T),"robbery",
           ifelse(grepl("ASSAULT", CrimeCat, ignore.case = T),"assault",
           ifelse(grepl("WEAPONS", CrimeCat, ignore.case = T),"weapons",
-          ifelse(grepl("DOM-VIOL", CrimeCat, ignore.case = T),"domestic_violence",
+          ifelse(grepl("DOM-VIOL", CrimeCat, ignore.case = T),
+                 "domestic_violence",
           ifelse(grepl("RAPE", CrimeCat, ignore.case = T),"rape",
           ifelse(grepl("TRAFFIC", CrimeCat, ignore.case = T),"traffic",
           ifelse(grepl("COURT", CrimeCat, ignore.case = T),"court",       
-                        ifelse(grepl("QUALITY|VANDALISM", CrimeCat, ignore.case = T),"quality_of_life","other"))))))))))
+          ifelse(grepl("QUALITY|VANDALISM", CrimeCat, ignore.case = T),
+                 "quality_of_life","other"))))))))))
 
 ```
 
@@ -234,11 +276,9 @@ I then surveyed examples from the output with `head(crimes,50)` and `tail(crimes
 
 As in previous examples, I created a new dataframe with dplyr functions, this time grouping by both date and the new `mainCat` variable.
 
-Also - to note - I was seeing several report data points for dates in the future. I assume these were the result of data entry errors. For all plots going forward, I have chosen to subset by incidents occurring prior to a 'cut-off' date of June 2015.
 
 ```{r Exploration - line chart of crime incidents per day grouped by crime type (b)}
 
-cutOffDate = '2015-06-01'
 crime_types_by_day <- subset(crimes, date_format < cutOffDate) %>%
   group_by(date_format, mainCat) %>%
   summarize(incidents = sum(any_crime),
@@ -290,9 +330,7 @@ The strange discontinuity at the 2014 year mark I noted earlier is also present 
 
 Besides tracking crime dynamics by type, I also wanted to explore how crimes were distributed geographically by Police Beats. To do so, I used the Beat variable, which indicates where the crime occurred/was recorded. More detail on the 'Beat' variable is available in the Dataset description below and at [this link](http://rikiwiki.electronicartifacts.com/opd-crime-statistics/crimecatoak). There are 135 distinct police beats included as `Beat` values, with some values strictly numeric (like '31') and others having alphanumeric identifiers (like '26X').
 
-Below is a map of police beats, as provided by the Oakland Police Department ([link here](http://oakgis.maps.arcgis.com/apps/OnePane/basicviewer/index.html?appid=69801e23ca8e456fbe6af18d2e88c614))
-
-![Oakland Police Beat Map](https://raw.githubusercontent.com/burnssa/nd_project_3/master/Final%20Project/OaklandPoliceBeats.png)
+Links are available, as provided by the Oakland Police Department ([here here](http://oakgis.maps.arcgis.com/apps/OnePane/basicviewer/index.html?appid=69801e23ca8e456fbe6af18d2e88c614))
 
 Similar to the previous exploration, I built a new dataframe, grouping on incidents per month and `Beat`.
 
@@ -320,7 +358,7 @@ ggplot(crime_by_month_and_beat, aes(x = month, fill=Beat)) +
 
 ```
 
-Going forward I decided that there are too many police beats to effectively display in a chart, and wanted to take the top 20 beats, then group incidents in other beats all under 'Other'. As you'll see in calculations below - these top 20 beats cover about 52% of all crime reports with descriptions (our `any_crime` variable).
+Going forward I decided that there are too many police beats to effectively display in a chart, and wanted to take the top 20 beats by total crime reports, then group incidents in other beats all under 'Other'. As you'll see in calculations below - these top 20 beats cover about 52% of all crime reports with descriptions (our `any_crime` variable).
 
 First I created dataframe with total crime incidents regardless of date.
 
@@ -328,7 +366,7 @@ Then I added another column to the crimes - `mainBeat`, perserving the value for
 
 Following the transformation, I revised the `crime_by_month_and_beat` dataframe with the mainBeat variable to produce clearer output, re-plotting with facet wrap to more clearly see the crime incident dynamic by beat.
 
-```{r Exploration - crime incidence by geography over time}
+```{r Exploration - crime incidence by geography over time (c)}
 
 total_crime_by_beat <- subset(crimes, date_format < cutOffDate) %>%
   group_by(Beat) %>%
@@ -339,25 +377,127 @@ total_crime_by_beat <- subset(crimes, date_format < cutOffDate) %>%
 sum(total_crime_by_beat$incidents[1:20]) / sum(total_crime_by_beat$incidents)
 
 topBeats = total_crime_by_beat$Beat[1:20]
-crimes <- transform(crimes, mainBeat = ifelse((Beat %in% topBeats), as.character(Beat), 'other'))
+crimes <- transform(crimes, mainBeat = ifelse((Beat %in% topBeats), 
+                                              as.character(Beat), 'other'))
 
-crime_by_month_and_beat <- subset(crimes, date_format < cutOffDate) %>%
+crime_by_month_and_main_beat <- subset(crimes, date_format < cutOffDate) %>%
   group_by(month, mainBeat) %>%
   summarize(incidents = sum(any_crime),
             n = n()) %>%
             ungroup() %>%
   arrange(incidents)
 
-ggplot(aes(x= month, y=incidents), data=crime_by_month_and_beat) +
+ggplot(aes(x= month, y=incidents), data=crime_by_month_and_main_beat) +
   geom_line(aes(color = mainBeat)) +
   facet_wrap(~ mainBeat, scales='free_y') +
   geom_smooth()
-summary(crime_by_month_and_beat)
+summary(crime_by_month_and_main_beat)
+
 ```
 
-Again, in the per-Beat facet breakdown we see uniformly down-trending crime incidence over time, with some beats experiencing more pronounced local spikes up around mid- to end of 2013. For some beats, including 04X, 08X, 20X and others, we also see the strange discontinuity at the end of 2013 that appeared in other views of monthly crime over time. 
+Again, in the per-Beat facet view we see uniformly down-trending crime incidence over time, with some beats experiencing more pronounced local spikes up around mid- to end of 2013. For some beats, including 04X, 08X, 20X and others, we also see the strange discontinuity at the end of 2013 that appeared in other views of monthly crime over time. 
 
 For these police beats, crime stays steady or spikes toward the end of 2013, then precipitously drops right at the new year, and remains or declines from the lower level to the present day.
+
+Mapping trends to geography, we can see where each of the top 20 police beats are located in our map below.
+
+![Oakland Police Beat Map](https://raw.githubusercontent.com/burnssa/nd_project_3/master/Final%20Project/OaklandPoliceBeats.png)
+Courtesy of the [Oakland Police Department](http://oakgis.maps.arcgis.com/apps/OnePane/basicviewer/index.html?appid=69801e23ca8e456fbe6af18d2e88c614)
+
+Note that many of the top beats by crime incidence correspond to the 'hotter' regions in downtown Oakland as shown in our earlier exploratory heatmap, particularly '08X', '04X' and '06X'.
+
+As a reminder, we can see a modified heatmap below, plotted over a Google roadmap.
+
+```{r Exploration - crime heatmap reference, fig.width=20, fig.height=16}
+
+oakland_roadmap_location <- c(-122.326, 37.74, -122.17, 37.85)
+oakland_roadmap <- get_map(location = oakland_roadmap_location, 
+                           source="google", maptype="roadmap")
+
+ggmap(oakland_roadmap) +
+  geom_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat), size = .3) +
+  stat_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat, 
+                fill = ..level.., alpha = ..level..), 
+                size = 0.2, bins = 20, geom = 'polygon') +
+  scale_fill_gradient(low = "blue", high = "red") +
+  labs(x = 'Longitude', y = 'Latitude') + 
+  ggtitle('Crime Heatmap for Oakland, CA:\n January 2007 to June 2015') +
+  theme(plot.title = element_text(lineheight=1, face="bold", size = 30, 
+                                  vjust = 1.5)) +
+  theme(axis.title.y = element_text(lineheight=1, size=14, vjust=1.5)) +
+  theme(axis.title.x = element_text(lineheight=1, size=14, vjust=0.5)) +
+  guides(fill = guide_legend(position='None'))
+  
+```
+
+I chose to loop back on the question of geographic distribution over time with a comparison of crime heatmaps for periods at the beginning and end of our dataset. Two heatmaps are arranged with a similar density scale to see what the distribution of crime looked like in Oakland during 2008 vs 2014. Consistent with earlier analysis, by 2014 the map is 'cooler' overall, with bright hotspots more subdued.
+
+```{r Exploration - crime heatmap reference - 2014 vs 2008, fig.width=30, fig.height=24}
+
+crimes_two_o_eight <- subset(crimesMapSubset, date_format >= '2008-01-01' & 
+                              date_format < '2009-01-01' )
+crimes_two_fourteen <- subset(crimesMapSubset, date_format >= '2014-01-01' & 
+                              date_format < '2015-01-01' )
+
+two_o_eight_map <- ggmap(oakland_roadmap) +
+        stat_density2d(data = crimes_two_o_eight, aes(x = Lng, y = Lat, 
+                        fill = ..level.., alpha = ..level..), 
+                        size = 0.2, bins = 20, geom = 'polygon', 
+                        limits=c(0,1000),breaks=seq(0,1000,by=100)) +
+        scale_fill_gradient(low = "blue", high = "red", limits=c(0,1000)) +
+        labs(x = 'Longitude', y = 'Latitude') + 
+        ggtitle('Crime Heatmap for Oakland, CA:\n January 2008 to December 2008') +
+        theme(plot.title = element_text(lineheight=1, face="bold", size = 30, 
+                                        vjust = 1.5)) +
+        theme(axis.title.y = element_text(lineheight=1, size=20, vjust=1.5)) +
+        theme(axis.title.x = element_text(lineheight=1, size=20, vjust=0.5)) +
+        scale_alpha_continuous(limits=c(0,1000)) +
+        guides(fill = guide_legend(position='None'))
+
+two_fourteen_map <- ggmap(oakland_roadmap) +
+        stat_density2d(data = crimes_two_fourteen, aes(x = Lng, y = Lat, 
+                      fill = ..level.., alpha = ..level..), 
+                      size = 0.2, bins = 20, geom = 'polygon', 
+                      limits=c(0,1000),breaks=seq(0,1000,by=100)) +
+        scale_fill_gradient(low = "blue", high = "red", limits=c(0,1000)) +
+        labs(x = 'Longitude', y = 'Latitude') + 
+        ggtitle('Crime Heatmap for Oakland, CA:\n January 2014 to December 2014') +
+        theme(plot.title = element_text(lineheight=1, face="bold", size = 30, 
+                                        vjust = 1.5)) +
+        theme(axis.title.y = element_text(lineheight=1, size=20, vjust=1.5)) +
+        theme(axis.title.x = element_text(lineheight=1, size=20, vjust=0.5)) +
+        scale_alpha_continuous(limits=c(0,1000)) +
+        guides(fill = guide_legend(position='None'))
+
+grid.arrange(two_o_eight_map, two_fourteen_map, ncol=2)
+  
+```
+
+In focusing primarily on the highest-crime beats in the last few graphs, changes in the distribution of crime across beats were less obvious, so I decided to create a plot to fill that gap. The following is a plot of centralilty measures for monthly crime incidents by police beat. I thought the results might also offer suggestions for exploring the logic and purpose of police beat demarcation. 
+
+*Monthly crime reports by Police Beat - mean, median, top decile and bottom decile of incidents*
+
+```{r Exploration - distribution of crime rates by beat}
+
+ggplot(aes(x = month, y = incidents), data = crime_by_month_and_beat) +
+  geom_line(stat = 'summary', fun.y = mean) +
+  geom_line(stat = 'summary', fun.y = median, color = 'green') +
+  geom_line(stat = 'summary', fun.y = quantile, probs = .9,
+            linetype = 2, color = 'blue') +
+  geom_line(stat = 'summary', fun.y = quantile, probs = .1,
+            linetype = 2, color = 'darkgreen')
+
+```
+
+A few things were striking to me about these plots: 
+
+* Mean and median crime rates by beat are tightly aligned, suggesting that crime incidence is fairly evenly distributed over beats.
+
+* The steep decline in crime seen in the top-20 police beats by crime rate is not so evident for median and police beats from lower-quantile segments - in fact, the crime threshold for the bottom decile of police beats actually increased from 2008 levels. Thus most of the aggregate reduction in crime over the last few years seems to have come from declining crime rates in the highest-crime police beats.
+
+* The distribution of crime rates across police beats has narrowed significantly as a result of the above trends - the ratio of monthly crimes in the top decile police beats vs the bottom decile was about 275 / 5 before 2008 but around 120 / 10 by 2014.
+
+Also - the spike in incidents for bottom quartile police beats by crime rate in 2010 is somewhat strange. I suspect it might be an artifact of new police beats being created at that time.
 
 ***
   
@@ -383,22 +523,25 @@ crime_by_week <- subset(crimes, date_format < cutOffDate) %>%
 
 ggplot(aes(x=week, y=log(incidents)), data=crime_by_week) +
   geom_line(color = 'darkblue', alpha = 0.8) +
-  ylab("Log of Crimes Reported Per Week") +
+  ylab("Crimes Reported Per Week (Log-scale)") +
   xlab("Date") +
-  scale_y_continuous(breaks = seq(6,8,0.25)) +
+  scale_y_continuous(breaks = seq(6,8,0.25), labels = comma) +
   stat_smooth(method = 'lm', formula = I(y)~I(as.numeric(x)),  color = 'red') +
   ggtitle("Weekly Crime Incidence in Oakland:\n January 2007 to June 2015") +
-  theme(plot.title = element_text(lineheight=.8, face="bold", size = 30)) +
-  theme(axis.title.y = element_text(lineheight=1, face="bold", size=20, vjust=1.5)) +
-  theme(axis.title.x = element_text(lineheight=1, face="bold", size=20, vjust=0.5))
+  theme(plot.title = element_text(lineheight=1, face="bold", size = 30)) +
+  theme(axis.title.y = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=1.5)) +
+  theme(axis.title.x = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=0.5),
+        axis.text = element_text(size=20, face="bold"))
 
 ```
 
 For my final aggregate chart, I also wanted to set up a simple model for assessing crime trends. Looking at our trend line, I note that a linear model provides a very strong fit, with a F-test p-value of close to zero and a R-squared of around 0.82.
 
-Based on the coefficient estimated, it looks like crime has been trending down at a rate of 11% per year on average.
+Based on the coefficient estimated, it looks like crime has been trending down at a rate of 11% per year on average over the dataset period.
 
-```{r Final Plot 1b - Aggregate Trends in Crime Rates}
+```{r Final Plot 1b - Aggregate Trends in Crime Rates, include=FALSE}
 
 c1 <- lm(I(log(incidents)) ~ I(as.numeric(week)), data = crime_by_week)
 summary(c1)
@@ -409,128 +552,111 @@ summary(c1)
 
 In my second chart, I wanted to refine the faceted-by-crime-type charts I produced in the exploratory analysis, but use corresponding regression lines based on linear models for each facet as in Final Plot 1. For the facets, I decided to draw on monthly crime statistics, as weekly figures in certain categories were very sparse with too much variance, and I left the y-scale free.
 
-```{r Final Plot 2a - Trends in Crime Rates by Crime Type, fig.width=24, fig.height=14}
+```{r Final Plot 2a - Trends in Crime Rates by Crime Type, fig.width=20, fig.height=16}
+fmt <- function(){
+    function(x) format(x,nsmall = 1,scientific = FALSE)
+}
 
 ggplot(aes(x=month, y=log(incidents)), data=crime_types_by_month) +
   geom_line(aes(color = mainCat), alpha = 0.9) +
-  ylab("Log of Crimes Reported Per Month") +
+  ylab("Crimes Report Per Month (Log Scale)") +
   xlab("Date") +
   facet_wrap(~ mainCat, scales='free_y', ncol=5) +
+  scale_y_continuous(labels = fmt()) +
   stat_smooth(method = 'lm', formula = I(y)~I(as.numeric(x)),  color = 'red') +
-  ggtitle("Monthly Crime Incidence in Oakland by Crime Category:\n January 2007 to June 2015") +
-  theme(plot.title = element_text(lineheight=1, face="bold", size=30, vjust=1)) +
-  theme(axis.title.y = element_text(lineheight=1, face="bold", size=20, vjust=1.5)) +
-  theme(axis.title.x = element_text(lineheight=1, face="bold", size=20, vjust=0.5)) +
-  scale_color_discrete(name = "Crime Category") +
-  theme(strip.text.x = element_text(size = 18, colour = "blue", face='bold'))
+  ggtitle("Monthly Crime Incidence in Oakland by Crime Category:\n 
+          January 2007 to June 2015") +
+  theme(plot.title = element_text(lineheight=0.5, face="bold", size=30, 
+                                  vjust=1),
+        axis.title.y = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=1.5),
+        axis.title.x = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=0.5),
+        strip.text.x = element_text(size = 14, colour = "blue", 
+                                    face='bold'),
+        axis.text = element_text(size = 16),
+        legend.title = element_text(size = 24),
+        legend.text = element_text(size = 22, lineheight = 1.5),
+        legend.key = element_rect(size = 2)
+        ) +
+  scale_color_discrete(name = "Crime Category")
 
 ```
 
 Note that the discontinuities in crime reduction around the beginning of 2014 are even more striking when plotting the log of incidents on the y axis.
 
-To test how the inclusion of crime type variables could improve the fit of our trend line, I decided to also include `mainCat` as a independent variable in a linear regression model. The addition seems to improve fit slightly versus a model of incidents vs time. R-squared for the new model is 0.85.
+To test how the inclusion of crime type variables might shape the fit of our trend line, I decided to also include `mainCat` as a independent variable in a linear regression model. The addition seems to improve fit slightly versus a model of incidents vs time. R-squared for the new model is 0.85.
 
-```{r Final Plot 2b - Trends in Crime Rates by Crime Type }
+```{r Final Plot 2b - Trends in Crime Rates by Crime Type, include=FALSE}
 
-cm1 <- lm(I(log(incidents)) ~ I(as.numeric(month)), data = crime_types_by_month)
+cm1 <- lm(I(log(incidents)) ~ I(as.numeric(month)), 
+          data = crime_types_by_month)
 cm2 <- update(cm1, ~ . + mainCat)
 summary(cm2)
 
 ```
 
-### Final Plot 3: View of monthly crime, faceted by police beat
+### Final Plot 3: View of trends in median, mean and quantile measures of monthly crime by police beat
 
-Similarly, I revisited my `crime_by_month_and_beat` to polish visuals showing how crime has trended by police beat. I used facet wrap to highlight the trend for each beat, and a log y scale as in Final Plots 1 and 2.
+For the third chart, I decided to clean up my line plot of monthly crime rate centrality measures over police beats, to better highlight the key features of similar plots I tried in the earlier exploration phase.
 
-```{r Final Plot 3a - Trends in Crime Rates by crime type, fig.width=18, fig.height=24}
+```{r Final Plot 3a - Trends in Crime Rates by Police Beat Crime Rate Quantile, fig.width=20, fig.height=16}
 
-ggplot(aes(x=month, y=log(incidents)), data=crime_by_month_and_beat) +
-  geom_line(aes(color = mainBeat), alpha = 0.9) +
-  ylab("Log of Crimes Reported Per Month") +
+crime_beat_distribution_by_month <- crime_by_month_and_beat %>%
+  group_by(month) %>%
+  summarize(mean = mean(incidents),
+            median = median(incidents),
+            top_decile = quantile(incidents, 0.9),
+            bottom_decile = quantile(incidents, 0.1)) %>%
+  arrange(month)
+
+cbd.melt <- melt(crime_beat_distribution_by_month, id = "month", 
+                 variable.name = "measure")
+
+ggplot(cbd.melt, aes(x = month, y = value, group = measure)) +
+  geom_line(aes(color = measure), size = 1) +
+  stat_smooth(method = 'lm', formula = I(y)~I(as.numeric(x)), 
+              color = 'lightblue', alpha = 0.2, size = 0.3) +
+  scale_color_brewer(type = "qual", palette = 2, 
+                     labels = c("Beat Mean", "Beat Median", 
+                                "Top Decile of Beats", 
+                                "Bottom Decile of Beats"),
+                     name = "Beat Group (by Crime Rate)") +
+  ggtitle("Monthly Crime Reports for Oakland Police Beats:\n 
+          January 2007 to June 2015") +
+  ylab("Crime Reports Per Month") +
   xlab("Date") +
-  facet_wrap(~mainBeat, scales='free_y', ncol=3) +
-  stat_smooth(method = 'lm', formula = I(y)~I(as.numeric(x)),  color = 'red') +
-  ggtitle("Monthly Crime Incidence in Oakland by Police Beat:\n January 2007 to June 2015") +
-  theme(plot.title = element_text(lineheight=1, face="bold", size = 30, vjust = 1.5)) +
-  theme(axis.title.y = element_text(lineheight=1, face="bold", size=20, vjust=1.5)) +
-  theme(axis.title.x = element_text(lineheight=1, face="bold", size=20, vjust=0.5)) +
-  scale_color_discrete(name = "Police Beat") +
-  theme(strip.text.x = element_text(size = 18, colour = "blue", face='bold'))
+  theme(plot.title = element_text(lineheight=0.5, face="bold", size = 30, 
+                                  vjust=1.5),
+        axis.title.y = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=1.5),
+        axis.title.x = element_text(lineheight=1, face="bold", size=24, 
+                                    vjust=0.5),
+        axis.text = element_text(size = 22),
+        legend.title = element_text(size = 24),
+        legend.text = element_text(size = 22, lineheight = 1.5),
+        legend.key = element_rect(size = 2),
+        text = element_text(size = 18))
 
 ```
 
-Mapping trends to geography, we can see where each of the top 20 police beats are located in our map below.
+To test how the inclusion of crime type variables would change our trend line, I decided to also include `Beat` as a independent variable in a linear regression model of `log(incidents)` versus month. The addition seems to raise trend fit versus a model of just incidents vs time, with R-squared for the new model at 0.88. By conditioning trends on police beat we see a lower average rate of crime reduction than with overall data. With the linear model here, it looks like crime for the typical police beat is diminishing at a rate of around 9.5% per year. 
 
-![Oakland Police Beat Map](https://raw.githubusercontent.com/burnssa/nd_project_3/master/Final%20Project/OaklandPoliceBeats.png)
-Courtesy of the [Oakland Police Department](http://oakgis.maps.arcgis.com/apps/OnePane/basicviewer/index.html?appid=69801e23ca8e456fbe6af18d2e88c614)
+```{r Final Plot 3c - Trends in Crime Rates by Police Beat Crime Rate Quantile, include=FALSE}
 
-Note that many of the top beats by crime incidence correspond to the 'hotter' regions in downtown Oakland as shown in our earlier exploratory heatmap, particularly '08X', '04X' and '06X'.
-
-As a reminder, we can see a modified heatmap below, plotted over a Google roadmap.
-
-```{r Final Plot 3c - crime heatmap reference, fig.width=20, fig.height=16}
-
-oakland_roadmap_location <- c(-122.326, 37.74, -122.17, 37.85)
-oakland_roadmap <- get_map(location = oakland_roadmap_location, source="google", maptype="roadmap")
-
-ggmap(oakland_roadmap) +
-  geom_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat), size = .3) +
-  stat_density2d(data = crimesMapSubset, aes(x = Lng, y = Lat, fill = ..level.., alpha = ..level..), size = 0.2, bins = 20, geom = 'polygon') +
-  scale_fill_gradient(low = "blue", high = "red") +
-  labs(x = 'Longitude', y = 'Latitude') + 
-  ggtitle('Crime Heatmap for Oakland, CA:\n January 2007 to June 2015') +
-  theme(plot.title = element_text(lineheight=1, face="bold", size = 30, vjust = 1.5)) +
-  theme(axis.title.y = element_text(lineheight=1, size=14, vjust=1.5)) +
-  theme(axis.title.x = element_text(lineheight=1, size=14, vjust=0.5))
-  
-```
-
-I chose to close out the exploratory analysis with a comparison of crime heatmaps for periods at the beginning and end of our dataset. Two heatmaps are arranged with a similar density scale to see what the distribution of crime looked like in Oakland during 2008 vs 2014. Consistent with earlier analysis, by 2014 the map is 'cooler' overall, with bright hotspots more subdued.
-
-```{r Final Plot 3d - crime heatmap reference - 2014 vs 2008, fig.width=30, fig.height=24}
-
-crimes_two_o_eight <- subset(crimesMapSubset, date_format >= '2008-01-01' & date_format < '2009-01-01' )
-crimes_two_fourteen <- subset(crimesMapSubset, date_format >= '2014-01-01' & date_format < '2015-01-01' )
-
-two_o_eight_map <- ggmap(oakland_roadmap) +
-        stat_density2d(data = crimes_two_o_eight, aes(x = Lng, y = Lat, fill = ..level.., alpha = ..level..), size = 0.2, bins = 20, geom = 'polygon', limits=c(0,1000),breaks=seq(0,1000,by=100)) +
-        scale_fill_gradient(low = "blue", high = "red", limits=c(0,1000)) +
-        labs(x = 'Longitude', y = 'Latitude') + 
-        ggtitle('Crime Heatmap for Oakland, CA:\n January 2008 to December 2008') +
-        theme(plot.title = element_text(lineheight=1, face="bold", size = 30, vjust = 1.5)) +
-        theme(axis.title.y = element_text(lineheight=1, size=20, vjust=1.5)) +
-        theme(axis.title.x = element_text(lineheight=1, size=20, vjust=0.5)) +
-        scale_alpha_continuous(limits=c(0,1000))
-
-two_fourteen_map <- ggmap(oakland_roadmap) +
-        stat_density2d(data = crimes_two_fourteen, aes(x = Lng, y = Lat, fill = ..level.., alpha = ..level..), size = 0.2, bins = 20, geom = 'polygon', limits=c(0,1000),breaks=seq(0,1000,by=100)) +
-        scale_fill_gradient(low = "blue", high = "red", limits=c(0,1000)) +
-        labs(x = 'Longitude', y = 'Latitude') + 
-        ggtitle('Crime Heatmap for Oakland, CA:\n January 2014 to December 2014') +
-        theme(plot.title = element_text(lineheight=1, face="bold", size = 30, vjust = 1.5)) +
-        theme(axis.title.y = element_text(lineheight=1, size=20, vjust=1.5)) +
-        theme(axis.title.x = element_text(lineheight=1, size=20, vjust=0.5)) +
-        scale_alpha_continuous(limits=c(0,1000))
-
-grid.arrange(two_o_eight_map, two_fourteen_map, ncol=2)
-  
-```
-
-To test how police beat data could improve our trend fit I decided to also include `mainBeat` as a independent variable in a linear model with monthly data. The addition seems to improve fit slightly - the R-squared when modeling with police beat values reaches 0.93.
-
-```{r Final Plot 3b - Trends in Crime Rates by crime type}
-
-cmb1 <- lm(I(log(incidents)) ~ I(as.numeric(month)), data = crime_by_month_and_beat)
-cmb2 <- update(cmb1, ~ . + mainBeat)
+cmb1 <- lm(I(log(incidents)) ~ I(as.numeric(month)), 
+           data = subset(crime_by_month_and_beat, incidents > 0))
+cmb2 <- update(cmb1, ~ . + Beat)
 summary(cmb2)
 
 ```
+
 
 ***
 
 # Reflection
 
-My biggest struggles with the dataset related to the process of grouping data into dataframes with incidents over useful time periods, transforming data to proper formats, and segmenting by tractable crime and police beat groups. Going through the steps required for my initial and final plots, I learned much about string matching, dataframe reshaping and subsetting in R, as well as heatmap plotting with ggmap.
+My biggest struggles with the dataset related to the process of grouping data into dataframes with incidents over useful time periods, transforming data to proper formats, segmenting by tractable crime and police beat groups and properly formatting my final plots. Going through the steps required for the output here, I learned much about string matching, dataframe reshaping and subsetting in R, as well as heatmap plotting with ggmap and themes for ggplot.
 
 Once the data were properly grouped and I could run plots, I found the output to be fascinating. Coming across the dataset was a huge success for me, as it is a rich source of insight on a topic in which I have a strong interest. Approaches to plotting learned in the Data Analysis in R course proved useful for visualizing elements of the dataset to reveal the evidence highlighted above.
 
@@ -538,10 +664,12 @@ The exploratory analysis here prompts me to explore a few more questions on the 
 
 1. What caused the massive, sudden drop at the beginning of 2014 in reported crimes for many crime categories? The discontinuity at the change in the year is so striking, it seems that it must be due to a change in policing or reporting policy, rather than a strange and dramatic drop-off in crimes committed.
 2. How are crime types and police beats correlated? Are there specific regions associated with particular crimes?
-3. What does the heatmap look like for specific crime times (e.g. violent crime or robbery)?
-4. With additional data, I'd love to explore how changes in crime rates have been associated with changes in economic outcomes, property values and educational indicators in Oakland. 
+3. What does the heatmap look like for specific crime types (e.g. violent crime or robbery)?
+4. (with additional data) How have shifts crime rates corresponded to changes in economic outcomes, property values and educational indicators in Oakland?
 
 In my explorations, I also came across many references to packages that might be useful for time-series analysis in the future, such as ['zoo'](https://cran.r-project.org/web/packages/zoo/index.html). I'd like to try these out on other datasets.
+
+Also, I see the need to become more familiar with using functions when plotting in R, so that I can better re-apply logic, plot formatting and continue to eliminate code repitition.
 
 ***
 
@@ -572,6 +700,11 @@ https://www.nceas.ucsb.edu/~frazier/RSpatialGuides/ggmap/ggmapCheatsheet.pdf
 https://cran.r-project.org/web/packages/ggmap/ggmap.pdf
 http://www.geo.ut.ee/aasa/LOOM02331/heatmap_in_R.html
 
+Formatting plots:
+http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
+http://stackoverflow.com/questions/10035786/ggplot2-y-axis-label-decimal-precision
+http://docs.ggplot2.org/current/theme.html
+http://docs.ggplot2.org/dev/vignettes/themes.html
 
 ***
 
