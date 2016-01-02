@@ -253,7 +253,7 @@ I assessed `unique(crimes$Desc)` but suppressed the output for this column becau
 
 On the other hand, the `CrimeCat` column includes about 60 unique categories as verified by `unique(crimes$CrimeCat)` This number is too large for tractable visualizations, but I decided I could group these into a smaller number of main categories (variable - `mainCat`) using grepl string matching.
 
-Thus I grouped crimes by homicide, robbery/larceny, assault, rape, weapons, domestic violence, traffic and court viaolations and 'quality of life' (this was a class of crimes noted in the dataset, which included somewhat minor violations including 'curfew-loitering', drug possession and incidents related to public liquor consumption).
+Thus I grouped crimes by homicide, robbery/larceny, assault, rape, weapons, domestic violence, traffic and court violations and 'quality of life' (this was a class of crimes noted in the dataset, which included somewhat minor violations including 'curfew-loitering', drug possession and incidents related to public liquor consumption).
 
 ```{r Exploration - crime incidents per day grouped by crime type (a)}
 
@@ -269,6 +269,10 @@ crimes <- transform(crimes, mainCat =
           ifelse(grepl("COURT", CrimeCat, ignore.case = T),"court",       
           ifelse(grepl("QUALITY|VANDALISM", CrimeCat, ignore.case = T),
                  "quality_of_life","other"))))))))))
+
+#Added to output for visualization exercise in D3
+trimmed_crimes_df <- crimes[,c("Lat","Lng","mainCat","date_format", "time_format")] 
+write.csv(trimmed_crimes_df, file = "oakland_crimes.csv")
 
 ```
 
